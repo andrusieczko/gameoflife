@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Conway's Game of Life</title>
+</head>
+<body>
+
+<div>
+  <table id="game">
+    <tbody>
+    </tbody>
+  </table>
+  <input type="button" id="start" value="Start">
+  <input type="button" id="stop" value="Stop">
+  <input type="button" id="random" value="Random">
+  <input type="button" id="clear" value="Clear">
+  | 
+  <label for="refreshInterval">Interval:</label><input type="text" id="refreshInterval" value="300">
+  <label for="randomFactor">Random factor:</label><input type="text" id="randomFactor" value="0.2">
+  |
+  Number of iterations: <span id="iterations"></span>
+</div>
+
+<script type="text/javascript">
+
+  /* UI */
+
+  const buildTable = ($table, width, height) => {
+    const $tbody = $table.querySelector('tbody');
+    for (let i = 0; i < width; i++) {
+      const $tr = document.createElement('tr');
+      $tbody.append($tr);
+      for (let j = 0; j < height; j++) {
+        const $td = document.createElement('td');
+        $td.setAttribute('id', `cell-${i}-${j}`)
+        $tr.append($td);
+      }
+    }
+  }
+
+  const render = (game, gameSettings, $table) => {
+    for (let i = 0; i < gameSettings.rows; i++) {
+      for (let j = 0; j < gameSettings.cols; j++) {
+        const $cell = $table.querySelector(`#cell-${i}-${j}`);
+        if (game.board[i][j]) {
+          $cell.classList.add('alive');
+        } else {
+          $cell.classList.remove('alive');
+        }
+      }
+    }
+  }
+
+  const updateIterations = (game) => {
+    document.querySelector('#iterations').textContent = game.iterations;
+  }
+
+
+  /* STATE */
+
+  const createBoard = ({rows, cols}) => {
+    return ([...Array(rows)]).map(_=>([...Array(cols)].map(_=>0)));
+  }
+
+  const gameSettings = {
+    rows: 30,
+    cols: 50
+  }
+  const game = {
+    board: createBoard(gameSettings),
+    refreshInterval: 300,
+    gameId: null,
+    iterations: 0
+  }
+
+  const $table = document.querySelector('#game');
+
+
+  /* LOGIC */
+
+  const nextState = (game) => {
+    const nextBoard = createBoard(gameSettings);
+    for (let i = 0; i < gameSettings.rows; i++) {
+      for (let j = 0; j < gameSettings.cols; j++) {
+        const neighbourTranslations = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+        const neighbours = neighbourTranslations.map(([x,y]) => [i+x, j+y]).filter(([x, y]) => x>=0&&y>=0&&x<gameSettings.rows&&y<gameSettings.cols).map(([x,y]) => game.board[x][y] ? 1 : 0);
+        const count = neighbours.reduce((acc, n) => acc + n, 0);
+        if (game.board[i][j]) {
+          if (count === 2 || count === 3) {
+            nextBoard[i][j] = true;
+          } else {
+            nextBoard[i][j] = false;
+          }
+        } else {
+          if (count === 3) {
+            nextBoard[i][j] = true;
+          } else {
+            nextBoard[i][j] = false;
+          }
+        }
+      }
+    }
+    return nextBoard;
+  }
+
+  const start = () => {
+    if (game.gameId) {
+      return;
+    }
+    game.gameId = setInterval(() => {
+      game.board = nextState(game);
+      render(game, gameSettings, $table);
+      game.iterations++;
+      updateIterations(game);
+    }, game.refreshInterval);
+  }
+  const stop = () => {
+    clearInterval(game.gameId);
+    game.gameId = null;
+  }
+
+  const random = () => {
+    for (let i = 0; i < gameSettings.rows; i++) {
+      for (let j =0; j < gameSettings.cols; j++) {
+        game.board[i][j] = Math.random() < document.querySelector('#randomFactor').value;
+      }
+    }
+    game.iterations = 0;
+    updateIterations(game);
+    render(game, gameSettings, $table);
+  }
+
+  const clear = () => {
+    for (let i = 0; i < gameSettings.rows; i++) {
+      for (let j =0; j < gameSettings.cols; j++) {
+        game.board[i][j] = false;
+      }
+    }
+    game.iterations = 0;
+    updateIterations(game);
+    render(game, gameSettings, $table);
+  }
+
+
+  /* UI BINDINGS */
+
+  document.querySelector('#game').addEventListener('click', (e) => {
+    const id = e.target.getAttribute('id');
+    const [_, x, y] = id.split('-');
+    game.board[x][y] = !game.board[x][y];
+    render(game, gameSettings, $table);
+  });
+
+  document.querySelector('#start').addEventListener('click', (e) => {
+    start();
+  });
+
+  document.querySelector('#stop').addEventListener('click', (e) => {
+    stop();
+  });
+
+  document.querySelector('#random').addEventListener('click', (e) => {
+    random();
+  });
+
+  document.querySelector('#clear').addEventListener('click', (e) => {
+    clear();
+  });
+
+  document.querySelector('#refreshInterval').addEventListener('keyup', (e) => {
+    game.refreshInterval = e.target.value;
+    stop();
+    start();
+  });
+
+
+  /* START */
+
+  buildTable($table, gameSettings.rows, gameSettings.cols);
+  render(game, gameSettings, $table);
+  updateIterations(game);
+
+</script>
+
+<style type="text/css">
+  
+  #game td {
+    width: 20px;
+    height: 20px;
+  }
+  #game td {
+    border: 1px black solid;
+  }
+
+  #game td.alive {
+    background-color:  black;
+  }
+
+</style>
+
+</body>
+</html>
