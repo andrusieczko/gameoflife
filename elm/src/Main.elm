@@ -1,9 +1,8 @@
 module Main exposing (..)
 import Browser
-import Html exposing (Html, Attribute, input, div, text, table, tbody, tr, td)
+import Html exposing (Html, Attribute, div, text, table, tbody, tr, td)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
-
 
 main =
   Browser.sandbox { init = init, update = update, view = view }
@@ -33,28 +32,41 @@ init =
   { game = (createGame gameSettings)}
 
 
+-- list operations
+
+set : List a -> Int -> a -> List a
+set list i x =
+  List.indexedMap (\index el -> if index == i then x else el) list
+
+setFn : List a -> Int -> (a -> a) -> List a
+setFn list i fn =
+  List.indexedMap (\index el -> if index == i then (fn el) else el) list
+
+set2 : List (List a) -> Int -> Int -> a -> List (List a)
+set2 list x y value =
+  List.indexedMap (\index row -> if index == x then (set row y value) else row) list
+
+set2Fn : List (List a) -> Int -> Int -> (a -> a) -> List (List a)
+set2Fn list x y fn =
+  List.indexedMap (\index row -> if index == x then (setFn row y fn) else row) list
+
 -- UPDATE
 
 
 type Msg
   = Flip Int Int
 
-
 update : Msg -> Model -> Model
 update msg model =
   case msg of
     Flip x y ->
-        {model | game = (List.indexedMap (\index row -> if index == x then (
-            List.indexedMap (\index2 col -> if index2 == y then not col else col) row
-          ) else row) model.game) }
+        {model | game = (set2Fn model.game x y not) }
 
 -- VIEW
 
 view : Model -> Html Msg
 view model =
-  table [] [
-    tbody [] (renderTable model)
-  ]
+  table [] [ tbody [] (renderTable model)]
 
 renderTable : Model -> List (Html Msg)
 renderTable model =
