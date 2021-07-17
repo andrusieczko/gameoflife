@@ -1,17 +1,19 @@
 module Main exposing (..)
 import Browser
-import Html exposing (Html, Attribute, div, text, table, tbody, tr, td)
+import Html exposing (Html, Attribute, table, tbody, tr, td)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
+import Time
 
 main =
-  Browser.sandbox { init = init, update = update, view = view }
+  Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
 
 
 -- MODEL
 
 type alias Model =
-  { game : List (List Bool)}
+  { game : List (List Bool),
+    running: Bool }
 
 
 createRows settings =
@@ -27,9 +29,11 @@ gameSettings =
   {rows = 30,
    cols = 30}
 
-init : Model
-init =
-  { game = (createGame gameSettings)}
+init : () -> (Model, Cmd Msg)
+init _ =
+  ({ game = (createGame gameSettings),
+    running = True },
+    Cmd.none)
 
 
 -- list operations
@@ -53,14 +57,28 @@ set2Fn list x y fn =
 -- UPDATE
 
 
-type Msg
-  = Flip Int Int
+type Msg =
+  Flip Int Int |
+  NextState
+  
 
-update : Msg -> Model -> Model
+
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Flip x y ->
-        {model | game = (set2Fn model.game x y not) }
+      ({model | game = (set2Fn model.game x y not) }, Cmd.none)
+
+    NextState ->
+      ({ model | game = (set2Fn model.game 1 1 not)}, Cmd.none)
+
+-- SUBSCRIPTIONS
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    if model.running
+        then Time.every 1000 (\_ -> NextState)
+        else Sub.none
 
 -- VIEW
 
@@ -70,14 +88,14 @@ view model =
 
 renderTable : Model -> List (Html Msg)
 renderTable model =
-  (List.indexedMap (renderRow model) model.game)
+  (List.indexedMap (renderRow) model.game)
 
-renderRow : Model -> Int -> List Bool -> Html Msg
-renderRow model x row =
-  tr [] (List.indexedMap (renderCell model x) row)
+renderRow : Int -> List Bool -> Html Msg
+renderRow x row =
+  tr [] (List.indexedMap (renderCell x) row)
 
-renderCell : Model -> Int -> Int -> Bool -> Html Msg
-renderCell model x y cell =
+renderCell : Int -> Int -> Bool -> Html Msg
+renderCell x y cell =
   td (List.append (styles [Cell, if cell then Alive else Nothing]) [onClick (Flip x y)]) []
 
 
