@@ -4,6 +4,7 @@ import Html exposing (Html, Attribute, table, tbody, tr, td)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Time
+import Array exposing (get, fromList, toList)
 
 main =
   Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
@@ -54,6 +55,27 @@ set2Fn : List (List a) -> Int -> Int -> (a -> a) -> List (List a)
 set2Fn list x y fn =
   List.indexedMap (\index row -> if index == x then (setFn row y fn) else row) list
 
+getList : List a -> Int -> a -> a
+getList list i default =
+  case get i (fromList list) of
+    Just a ->
+      a
+    Nothing ->
+      default
+
+
+getList2 : List (List a) -> Int -> Int -> a -> a
+getList2 list x y default =
+  case get x (fromList list) of
+    Just row ->
+      getList row y default
+    Nothing ->
+      default
+
+getBool2 : List (List Bool) -> Int -> Int -> Bool
+getBool2 list x y =
+  getList2 list x y False
+
 -- UPDATE
 
 
@@ -70,7 +92,20 @@ update msg model =
       ({model | game = (set2Fn model.game x y not) }, Cmd.none)
 
     NextState ->
-      ({ model | game = (set2Fn model.game 1 1 not)}, Cmd.none)
+      ({model | game = (updateTable model.game)}, Cmd.none)
+
+updateTable : List (List Bool) -> List (List Bool)
+updateTable table =
+  List.indexedMap (\index row -> updateRow index row table) table
+
+updateRow : Int -> List Bool -> List (List Bool) -> List Bool
+updateRow x row table =
+  List.indexedMap (\y cell -> updateCell x y cell table) row
+
+updateCell : Int -> Int -> Bool -> List (List Bool) -> Bool
+updateCell x y cell table =
+  not cell
+
 
 -- SUBSCRIPTIONS
 
@@ -96,14 +131,14 @@ renderRow x row =
 
 renderCell : Int -> Int -> Bool -> Html Msg
 renderCell x y cell =
-  td (List.append (styles [Cell, if cell then Alive else Nothing]) [onClick (Flip x y)]) []
+  td (List.append (styles [Cell, if cell then Alive else NoStyle]) [onClick (Flip x y)]) []
 
 
 -- Styles
 type Styles =
   Alive |
   Cell |
-  Nothing
+  NoStyle
 
 myStyle : Styles -> List (Attribute msg)
 myStyle s =
@@ -112,7 +147,7 @@ myStyle s =
       [ style "backgroundColor" "black" ]
     Cell ->
       [ style "width" "20px", style "height" "20px", style "border" "1px black solid" ]
-    Nothing ->
+    NoStyle ->
       []
 
 styles : List Styles -> List (Attribute msg)
