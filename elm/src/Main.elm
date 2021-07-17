@@ -4,7 +4,7 @@ import Html exposing (Html, Attribute, table, tbody, tr, td)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Time
-import Array exposing (get, fromList, toList)
+import Array exposing (get, fromList)
 
 main =
   Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
@@ -55,26 +55,22 @@ set2Fn : List (List a) -> Int -> Int -> (a -> a) -> List (List a)
 set2Fn list x y fn =
   List.indexedMap (\index row -> if index == x then (setFn row y fn) else row) list
 
-getList : List a -> Int -> a -> a
-getList list i default =
-  case get i (fromList list) of
-    Just a ->
-      a
-    Nothing ->
-      default
+getList : List a -> Int -> Maybe a
+getList list i =
+  get i (fromList list)
 
 
-getList2 : List (List a) -> Int -> Int -> a -> a
-getList2 list x y default =
+getList2 : List (List a) -> Int -> Int -> Maybe a
+getList2 list x y =
   case get x (fromList list) of
     Just row ->
-      getList row y default
+      getList row y
     Nothing ->
-      default
+      Nothing
 
-getBool2 : List (List Bool) -> Int -> Int -> Bool
+getBool2 : List (List Bool) -> Int -> Int -> Maybe Bool
 getBool2 list x y =
-  getList2 list x y False
+  getList2 list x y
 
 -- UPDATE
 
@@ -104,7 +100,18 @@ updateRow x row table =
 
 updateCell : Int -> Int -> Bool -> List (List Bool) -> Bool
 updateCell x y cell table =
-  not cell
+  let
+    neighbourTranslations = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+    neighboursMaybe = List.map (\(i, j) -> getBool2 table (x+i) (y+j)) neighbourTranslations
+    neighbours = List.filterMap identity neighboursMaybe
+    neighboursInt = List.map (\el -> if el then 1 else 0) neighbours
+    count = List.foldl (+) 0 neighboursInt
+    newState = if cell then
+        count == 2 || count == 3
+      else
+        count == 3
+   in
+    newState
 
 
 -- SUBSCRIPTIONS
@@ -112,7 +119,7 @@ updateCell x y cell table =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     if model.running
-        then Time.every 1000 (\_ -> NextState)
+        then Time.every 5000 (\_ -> NextState)
         else Sub.none
 
 -- VIEW
