@@ -1,10 +1,13 @@
 module Main exposing (..)
 import Browser
-import Html exposing (Html, Attribute, table, tbody, tr, td)
+import Html exposing (Html, Attribute, table, tbody, tr, td, div, button, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Time
-import Array exposing (get, fromList)
+import Array exposing (get, fromList, Array)
+import Random
+import Random.Array
+import Basics
 
 main =
   Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
@@ -14,8 +17,7 @@ main =
 
 type alias Model =
   { game : List (List Bool),
-    running: Bool }
-
+    running: Bool}
 
 createRows settings =
   List.repeat settings.rows False
@@ -28,12 +30,12 @@ createGame settings =
 
 gameSettings =
   {rows = 30,
-   cols = 30}
+   cols = 50}
 
 init : () -> (Model, Cmd Msg)
 init _ =
   ({ game = (createGame gameSettings),
-    running = True },
+    running = True},
     Cmd.none)
 
 
@@ -60,24 +62,22 @@ getList list i =
   get i (fromList list)
 
 
-getList2 : List (List a) -> Int -> Int -> Maybe a
-getList2 list x y =
+get2 : List (List a) -> Int -> Int -> Maybe a
+get2 list x y =
   case get x (fromList list) of
     Just row ->
       getList row y
     Nothing ->
       Nothing
 
-getBool2 : List (List Bool) -> Int -> Int -> Maybe Bool
-getBool2 list x y =
-  getList2 list x y
-
 -- UPDATE
 
 
 type Msg =
   Flip Int Int |
-  NextState
+  NextState |
+  GenerateRandomBoard |
+  RandomBoard (Array Int)
   
 
 
@@ -89,6 +89,18 @@ update msg model =
 
     NextState ->
       ({model | game = (updateTable model.game)}, Cmd.none)
+
+    GenerateRandomBoard ->
+      (model, Random.generate RandomBoard (Random.Array.array (gameSettings.cols * gameSettings.rows) (Random.int 1 100)))
+
+    RandomBoard randArray ->
+      ({model | game = (List.map (\x ->
+          List.map (\y ->
+            case (get (x*gameSettings.rows + y) randArray) of
+              Just a -> a < 30
+              Nothing -> False
+          ) (List.range 0 (gameSettings.cols - 1))
+        ) (List.range 0 (gameSettings.rows - 1)))}, Cmd.none)
 
 updateTable : List (List Bool) -> List (List Bool)
 updateTable table =
@@ -102,7 +114,7 @@ updateCell : Int -> Int -> Bool -> List (List Bool) -> Bool
 updateCell x y cell table =
   let
     neighbourTranslations = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
-    neighboursMaybe = List.map (\(i, j) -> getBool2 table (x+i) (y+j)) neighbourTranslations
+    neighboursMaybe = List.map (\(i, j) -> get2 table (x+i) (y+j)) neighbourTranslations
     neighbours = List.filterMap identity neighboursMaybe
     neighboursInt = List.map (\el -> if el then 1 else 0) neighbours
     count = List.foldl (+) 0 neighboursInt
@@ -119,14 +131,17 @@ updateCell x y cell table =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     if model.running
-        then Time.every 5000 (\_ -> NextState)
+        then Time.every 300 (\_ -> NextState)
         else Sub.none
 
 -- VIEW
 
 view : Model -> Html Msg
 view model =
-  table [] [ tbody [] (renderTable model)]
+  div [] [
+    table [] [ tbody [] (renderTable model)]
+    , button [ onClick GenerateRandomBoard ] [ text "Random" ]
+  ]
 
 renderTable : Model -> List (Html Msg)
 renderTable model =
