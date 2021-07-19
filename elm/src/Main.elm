@@ -4,7 +4,7 @@ import Html exposing (Html, Attribute, table, tbody, tr, td, div, button, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Time
-import Array exposing (get, set, fromList, toList, Array)
+import Array exposing (get, toList, Array)
 import Random
 import Random.Array
 import Basics
@@ -16,11 +16,17 @@ main =
 -- MODEL
 
 type alias Model =
-  { game : Array Bool,
+  { game : Array (Array Bool),
     running: Bool}
 
+createRows settings =
+  Array.repeat settings.rows False
+
+createCols settings =
+  Array.repeat settings.cols False
+
 createGame settings =
-  Array.repeat (settings.rows * settings.cols) False
+  Array.map (\_ -> createCols settings) (createRows settings)
 
 gameSettings =
   {rows = 30,
@@ -32,50 +38,27 @@ init _ =
     running = True},
     Cmd.none)
 
--- Data structure manipulation
 
-toX : Int -> Int
-toX index =
-  (index // gameSettings.rows)
+-- list operations
 
-toY : Int -> Int
-toY index =
-  (modBy gameSettings.rows index)
+setFn : Array a -> Int -> (a -> a) -> Array a
+setFn list i fn =
+  Array.indexedMap (\index el -> if index == i then (fn el) else el) list
 
-toIndex : Int -> Int -> Int
-toIndex x y =
-  gameSettings.rows * x  +y
+set2Fn : Array (Array a) -> Int -> Int -> (a -> a) -> Array (Array a)
+set2Fn list x y fn =
+  Array.indexedMap (\index row -> if index == x then (setFn row y fn) else row) list
 
-toMatrix : Array Bool -> List (List Bool)
-toMatrix list =
-  List.indexedMap (\_ indexX ->
-    List.indexedMap (\_ indexY ->
-      case (getCell list indexX indexY) of
-        Just a -> a
-        Nothing -> False
-    ) (List.range 0 gameSettings.cols)
-  ) (List.range 0 gameSettings.rows)
-
-getCell : Array a -> Int -> Int -> Maybe a
-getCell list x y =
-  get (toIndex x y) list
-
-
-setCellFn : Array a -> Int -> Int -> (a -> a) -> a -> Array a
-setCellFn list x y fn default =
-  set (toIndex x y) (fn (
-    case (getCell list x y) of
-      Just a ->
-        a
-      Nothing ->
-        default
-    )) list
-
-setCellFnBool list x y fn=
-  setCellFn list x y fn False
-
+get2 : Array (Array a) -> Int -> Int -> Maybe a
+get2 list x y =
+  case get x list of
+    Just row ->
+      get y row
+    Nothing ->
+      Nothing
 
 -- UPDATE
+
 
 type Msg =
   Flip Int Int |
@@ -83,11 +66,13 @@ type Msg =
   GenerateRandomBoard |
   RandomBoard (Array Int)
 
+
+
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     Flip x y ->
-      ({model | game = (setCellFnBool model.game x y not) }, Cmd.none)
+      ({model | game = (set2Fn model.game x y not) }, Cmd.none)
 
     NextState ->
       ({model | game = (updateTable model.game)}, Cmd.none)
@@ -96,21 +81,27 @@ update msg model =
       (model, Random.generate RandomBoard (Random.Array.array (gameSettings.cols * gameSettings.rows) (Random.int 1 100)))
 
     RandomBoard randArray ->
-      ({model | game = (Array.indexedMap (\index _ ->
-          case (get index randArray) of
-            Just a -> a < 30
-            Nothing -> False
-        ) (Array.repeat ((gameSettings.rows * gameSettings.cols) - 1) 0))}, Cmd.none)
+      ({model | game = (Array.indexedMap (\x _ ->
+          Array.indexedMap (\y _ ->
+            case (get (x*gameSettings.rows + y) randArray) of
+              Just a -> a < 30
+              Nothing -> False
+          ) (Array.repeat (gameSettings.cols - 1) 0)
+        ) (Array.repeat (gameSettings.rows - 1) 0))}, Cmd.none)
 
-updateTable : Array Bool -> Array Bool
+updateTable : Array (Array Bool) -> Array (Array Bool)
 updateTable table =
-  Array.indexedMap (\index cell -> updateCell (toX index) (toY index) cell table) table
+  Array.indexedMap (\index row -> updateRow index row table) table
 
-updateCell : Int -> Int -> Bool -> Array Bool -> Bool
+updateRow : Int -> Array Bool -> Array (Array Bool) -> Array Bool
+updateRow x row table =
+  Array.indexedMap (\y cell -> updateCell x y cell table) row
+
+updateCell : Int -> Int -> Bool -> Array (Array Bool) -> Bool
 updateCell x y cell table =
   let
     neighbourTranslations = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
-    neighboursMaybe = List.map (\(i, j) -> getCell table (x+i) (y+j)) neighbourTranslations
+    neighboursMaybe = List.map (\(i, j) -> get2 table (x+i) (y+j)) neighbourTranslations
     neighbours = List.filterMap identity neighboursMaybe
     neighboursInt = List.map (\el -> if el then 1 else 0) neighbours
     count = List.foldl (+) 0 neighboursInt
@@ -141,11 +132,11 @@ view model =
 
 renderTable : Model -> List (Html Msg)
 renderTable model =
-  (List.indexedMap (renderRow) (toMatrix model.game))
+  (toList (Array.indexedMap (renderRow) model.game))
 
-renderRow : Int -> List Bool -> Html Msg
+renderRow : Int -> Array Bool -> Html Msg
 renderRow x row =
-  tr [] (List.indexedMap (renderCell x) row)
+  tr [] (toList (Array.indexedMap (renderCell x) row))
 
 renderCell : Int -> Int -> Bool -> Html Msg
 renderCell x y cell =
