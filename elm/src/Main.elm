@@ -1,8 +1,8 @@
 module Main exposing (..)
 import Browser
-import Html exposing (Html, Attribute, table, tbody, tr, td, div, button, text)
+import Html exposing (Html, Attribute, table, tbody, tr, td, div, button, text, label, input, h1)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, onInput)
 import Time
 import Array exposing (get, toList, Array)
 import Random
@@ -17,7 +17,9 @@ main =
 
 type alias Model =
   { game : Array (Array Bool),
-    running: Bool}
+    running: Bool,
+    refreshInterval: String,
+    randomFactor: String}
 
 createRows settings =
   Array.repeat settings.rows False
@@ -30,12 +32,16 @@ createGame settings =
 
 gameSettings =
   {rows = 30,
-   cols = 50}
+   cols = 50,
+   refreshInterval = 300,
+   randomFactor = 0.2}
 
 init : () -> (Model, Cmd Msg)
 init _ =
   ({ game = (createGame gameSettings),
-    running = True},
+    running = False,
+    refreshInterval = (String.fromFloat gameSettings.refreshInterval),
+    randomFactor = (String.fromFloat gameSettings.randomFactor)},
     Cmd.none)
 
 
@@ -57,16 +63,28 @@ get2 list x y =
     Nothing ->
       Nothing
 
+
+d : Maybe a -> a -> a
+d value defaultValue =
+  case value of
+    Just a ->
+      a
+    Nothing ->
+      defaultValue
+
 -- UPDATE
 
 
 type Msg =
   Flip Int Int |
   NextState |
+  Start |
+  Stop |
+  Clear |
+  UpdateRefreshInterval String |
+  UpdateRandomFactor String |
   GenerateRandomBoard |
   RandomBoard (Array Int)
-
-
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -77,6 +95,21 @@ update msg model =
     NextState ->
       ({model | game = (updateTable model.game)}, Cmd.none)
 
+    Start ->
+      ({model | running = True}, Cmd.none)
+
+    Stop ->
+      ({model | running = False}, Cmd.none)
+
+    Clear ->
+      ({model | game = (createGame gameSettings)}, Cmd.none)
+
+    UpdateRefreshInterval refreshInterval ->
+      ({model | refreshInterval = refreshInterval}, Cmd.none)
+
+    UpdateRandomFactor randomFactor ->
+      ({model | randomFactor = randomFactor}, Cmd.none)
+
     GenerateRandomBoard ->
       (model, Random.generate RandomBoard (Random.Array.array (gameSettings.cols * gameSettings.rows) (Random.int 1 100)))
 
@@ -84,10 +117,10 @@ update msg model =
       ({model | game = (Array.indexedMap (\x _ ->
           Array.indexedMap (\y _ ->
             case (get (x*gameSettings.rows + y) randArray) of
-              Just a -> a < 30
+              Just a -> a < floor (d (String.toFloat model.randomFactor) gameSettings.randomFactor * 100)
               Nothing -> False
-          ) (Array.repeat (gameSettings.cols - 1) 0)
-        ) (Array.repeat (gameSettings.rows - 1) 0))}, Cmd.none)
+          ) (Array.repeat (gameSettings.cols) 0)
+        ) (Array.repeat (gameSettings.rows) 0))}, Cmd.none)
 
 updateTable : Array (Array Bool) -> Array (Array Bool)
 updateTable table =
@@ -118,7 +151,7 @@ updateCell x y cell table =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     if model.running
-        then Time.every 300 (\_ -> NextState)
+        then Time.every (d (String.toFloat model.refreshInterval) gameSettings.refreshInterval) (\_ -> NextState)
         else Sub.none
 
 -- VIEW
@@ -126,8 +159,18 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
   div [] [
+    h1 [] [text "Elm"],
     table [] [ tbody [] (renderTable model)]
-    , button [ onClick GenerateRandomBoard ] [ text "Random" ]
+    , button [ onClick Start ] [ text "Start " ]
+    , button [ onClick Stop ] [ text "Stop " ]
+    , button [ onClick GenerateRandomBoard ] [ text "Random " ]
+    , button [ onClick Clear ] [ text "Clear " ]
+    , text " | "
+    , label [ for "refreshInterval" ] [ text "Interval: " ]
+    , input [ type_ "text", id "refreshInterval", value model.refreshInterval, onInput UpdateRefreshInterval ] [ ]
+    , text " | "
+    , label [ for "randomFactor" ] [ text "Random factor: " ]
+    , input [ type_ "text", id "randomFactor", value model.randomFactor, onInput UpdateRandomFactor ] [ ]
   ]
 
 renderTable : Model -> List (Html Msg)
