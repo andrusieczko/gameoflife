@@ -3,23 +3,38 @@
   <head>
   </head>
   <body>
-        <div id="app"></div>
-        <script src="cljs-out/dev-main.js"></script>
+    <div>
+      <h1>Vanilla JavaScript</h1>
+      <table id="game">
+          <tbody>
+          </tbody>
+      </table>
+      <input type="button" id="start" value="Start">
+      <input type="button" id="stop" value="Stop">
+      <input type="button" id="random" value="Random">
+      <input type="button" id="clear" value="Clear">
+      |
+      <label for="refreshInterval">Interval:</label><input type="text" id="refreshInterval" value="300">
+      <label for="randomFactor">Random factor:</label><input type="text" id="randomFactor" value="0.2">
+      |
+      Number of iterations: <span id="iterations"></span>
+    </div>
+    <script src="cljs-out/dev-main.js"></script>
 
-        <style type="text/css">
-          #game td {
-            width: 20px;
-            height: 20px;
-          }
-          #game td {
-            border: 1px black solid;
-          }
+    <style type="text/css">
+      #game td {
+        width: 20px;
+        height: 20px;
+      }
+      #game td {
+        border: 1px black solid;
+      }
 
-          #game td.alive {
-            background-color:  black;
-          }
+      #game td.alive {
+        background-color:  black;
+      }
 
-        </style>
+    </style>
 
-    </body>
+  </body>
 </html>
