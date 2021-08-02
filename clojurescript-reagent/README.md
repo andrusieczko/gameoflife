@@ -1,4 +1,3 @@
-
 ### Development mode
 ```
 npm install
@@ -8,6 +7,9 @@ start a ClojureScript REPL
 ```
 npx shadow-cljs browser-repl
 ```
+
+and go to localhost:3000
+
 ### Building for production
 
 ```
